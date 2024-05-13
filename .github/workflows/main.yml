@@ -64,6 +64,7 @@ jobs:
           pip install flake8==6.0.0 flake8-isort==6.0.0
           pip install -r ./backend/requirements.txt 
       
+      # Запускаем flake8 и тесты из tests.py (из backend/api)
       # Этот шаг дополним переменными для доступа к БД
       - name: Test with flake8 and django tests
       # Добавляем env-переменные для доступа к БД
@@ -75,9 +76,6 @@ jobs:
           # Поэтому подключаемся к 127.0.0.1:5432
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
-
-      # Запускаем flake8 и тесты из tests.py (из backend/api)
-      - name: Test with flake8 and django tests
         # В ключе run хранится команда, которая будет выполнена в терминале окружения на раннере (на сервере для выполнения задач, который предоставлен сервисом GitHub Actions)
         # Вызываем flake8 и указываем ему, что нужно проверить файлы только в папке backend/
         # Далее перейти в папку backend (cd backend/) и запустить все тесты проекта (python manage.py test)
