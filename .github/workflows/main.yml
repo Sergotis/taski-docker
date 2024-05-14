@@ -9,10 +9,13 @@ on:
     branches:
       - main
 
+
 # Список действий, которые должны выполниться после срабатывания триггера
 jobs:
   # Задача, которую будем выпонлнять (имя задачи даем сами)
+  # Запустить тестирование приложения
   tests:
+    name: Сopying the code to the runner, checking with the linter and running tests
     # Определяет, в каком окружении будут запущены все команды этой задачи. Окружение создаёт на своём сервере GitHub Actions.
     runs-on: ubuntu-latest
 
@@ -92,3 +95,6 @@ jobs:
           python -m flake8 backend/
           cd backend/
           python manage.py test
+
+
+  
