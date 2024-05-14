@@ -100,7 +100,7 @@ jobs:
   # Задача для сбора и отправки образа БЕКЕНДА приложения на Docker Hub
   build_backend_and_push_to_docker_hub:
     # Каждой задаче (а из может быть несколько) можно дать имя — для этого применяется ключ name.
-    name: Push Docker image to DockerHub
+    name: Push backend Docker image to DockerHub
     # Определяет, в каком окружении будут запущены все команды этой задачи. Окружение создаёт на своём сервере GitHub Actions.
     runs-on: ubuntu-latest
     # Не выполнять сразу, ждать, пока выполнится задача "tests" (см. выше)
@@ -210,4 +210,60 @@ jobs:
           context: ./gateway/
           push: true
           # Тут вместо username должен быть ваш логин на Docker Hub
-          tags: sergotis/taski_gateway:latest 
+          tags: sergotis/taski_gateway:latest
+
+
+  # Обновление проекта на боевом сервере
+  deploy:
+    name: Deploy to working server
+    # Определяет, в каком окружении будут запущены все команды этой задачи. Окружение создаёт на своём сервере GitHub Actions.
+    runs-on: ubuntu-latest
+    needs:
+      # Не выполнять сразу, ждать, пока выполнятся задачи по сборке всех образов, перечисленных ниже (сами задачи описаны, выше по коду)
+      - build_and_push_to_docker_hub
+      - build_frontend_and_push_to_docker_hub
+      - build_gateway_and_push_to_docker_hub
+    steps:
+    # Копируем код проекта в рабочую директорию раннера
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    # Копируем docker-compose.production.yml на продакшен-сервер
+    - name: Copy docker-compose.yml via ssh
+      uses: appleboy/scp-action@master
+      # Передаём параметры для action appleboy/scp-action:
+      # При помощи with передаём в action параметры для авторизации на удаленном сервере
+      # Держать эти жанные прямо в текущем коде нельзя (он ведь будет запушен на гитаб)
+      # Поэтому сохраняем их в репозитории проекта на GITHUB в ввиде констант
+      # А далее передаем в формате ниже:
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USER }}
+        key: ${{ secrets.SSH_KEY }}
+        passphrase: ${{ secrets.SSH_PASSPHRASE }}
+        # Копируемый файл. Т.к. он лежит в корне проекта, то путь не нужн, только имя файла
+        source: "docker-compose.production.yml"
+        # Целевой путь на сервере, должен быть каталогом ( обязательно )
+        target: "taski"
+
+      # Соединение с удалённым сервером по SSH и работа с ним «из терминала на раннере» для выполнения различных команд
+    - name: Executing remote ssh commands to deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USER }}
+        key: ${{ secrets.SSH_KEY }}
+        passphrase: ${{ secrets.SSH_PASSPHRASE }}
+        # Параметр script передаёт в action appleboy/ssh-action команды, которые нужно выполнить на сервере, с которым установлено соединение
+        script: |
+          cd taski
+          # Выполняет pull (обновление) образов с Docker Hub
+          sudo docker compose -f docker-compose.production.yml pull
+          # Перезапускает все контейнеры в Docker Compose:
+          # удаляет контейнеры
+          sudo docker compose -f docker-compose.production.yml down
+          # запускает контейнеры (путем запуска Docker Compose в режиме демона)
+          sudo docker compose -f docker-compose.production.yml up -d
+          # Выполняет миграции и сбор статики и ее копирование
+          sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate
+          sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic
+          sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/static/ 
