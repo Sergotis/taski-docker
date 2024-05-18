@@ -10,4 +10,11 @@ RUN pip install -r requirements.txt --no-cache-dir
 
 COPY . .
 
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+RUN python manage.py migrate
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+RUN python manage.py collectstatic
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+COPY /app/collected_static/. /backend_static/static/
+
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi"]
